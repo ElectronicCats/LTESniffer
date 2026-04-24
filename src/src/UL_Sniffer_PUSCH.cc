@@ -399,23 +399,24 @@ void PUSCH_Decoder::decode()
     /*combine Uplink grant detected from RAR response (msg 2) and Uplink grant detected from DCI0*/
     if (dci_ul != nullptr || rar_dci_ul != nullptr)
     {
-        if (rar_dci_ul != nullptr && dci_ul != nullptr)
+        // Snapshot the DCI vectors before iteration. The source vectors live inside
+        // ULSchedule's map and another worker thread may insert into them concurrently,
+        // which would reallocate the buffer and invalidate iterators here.
+        std::vector<DCI_UL> dci_ul_snapshot;
+        if (dci_ul != nullptr)
+        {
+            dci_ul_snapshot = *dci_ul;
+        }
+        if (rar_dci_ul != nullptr)
         {
             int rar_size = rar_dci_ul->size();
-            if (rar_size > 0)
+            for (int rar_idx = 0; rar_idx < rar_size; rar_idx++)
             {
-                for (int rar_idx = 0; rar_idx < rar_size; rar_idx++)
-                {
-                    dci_ul->push_back(rar_dci_ul->at(rar_idx));
-                }
+                dci_ul_snapshot.push_back(rar_dci_ul->at(rar_idx));
             }
         }
-        else if (rar_dci_ul != nullptr && dci_ul == nullptr)
-        {
-            dci_ul = rar_dci_ul;
-        }
         /*Try to decode all member in grant list*/
-        for (auto decoding_mem : (*dci_ul))
+        for (auto decoding_mem : dci_ul_snapshot)
         {
             /*Investigate current decoding member to know it has a valid UL grant or not*/
             valid_ul_grant = investigate_valid_ul_grant(decoding_mem);
