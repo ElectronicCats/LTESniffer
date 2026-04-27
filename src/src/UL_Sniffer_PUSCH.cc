@@ -397,27 +397,28 @@ void PUSCH_Decoder::decode()
     sf_power->computePower(enb_ul.sf_symbols);
 
     /*combine Uplink grant detected from RAR response (msg 2) and Uplink grant detected from DCI0*/
-    if (dci_ul != nullptr || rar_dci_ul != nullptr)
+    if (!dci_ul.empty() || !rar_dci_ul.empty())
     {
-        // Snapshot the DCI vectors before iteration. The source vectors live inside
-        // ULSchedule's map and another worker thread may insert into them concurrently,
-        // which would reallocate the buffer and invalidate iterators here.
-        std::vector<DCI_UL> dci_ul_snapshot;
-        if (dci_ul != nullptr)
-        {
-            dci_ul_snapshot = *dci_ul;
-        }
-        if (rar_dci_ul != nullptr)
-        {
-            int rar_size = rar_dci_ul->size();
-            for (int rar_idx = 0; rar_idx < rar_size; rar_idx++)
-            {
-                dci_ul_snapshot.push_back(rar_dci_ul->at(rar_idx));
-            }
-        }
+        // Build the working list. dci_ul and rar_dci_ul are caller-owned copies
+        // (ULSchedule::getULSche / get_rar_ULSche return by value under the
+        // mutex), so no further synchronization is needed here.
+        std::vector<DCI_UL> work_list = dci_ul;
+        work_list.insert(work_list.end(), rar_dci_ul.begin(), rar_dci_ul.end());
+
         /*Try to decode all member in grant list*/
-        for (auto decoding_mem : dci_ul_snapshot)
+        for (auto decoding_mem : work_list)
         {
+            // Defense-in-depth: skip DCI_UL elements with any null shared_ptr
+            // member. With the locked snapshot above this should not happen,
+            // but a producer mid-emplace at lock acquisition could still be
+            // observable; the check is one branch per DCI and keeps decode
+            // robust against future producer-side changes.
+            if (decoding_mem.ran_ul_grant == nullptr ||
+                decoding_mem.ran_ul_grant_256 == nullptr ||
+                decoding_mem.ran_ul_dci == nullptr)
+            {
+                continue;
+            }
             /*Investigate current decoding member to know it has a valid UL grant or not*/
             valid_ul_grant = investigate_valid_ul_grant(decoding_mem);
             /*Only decode member with valid UL grant*/
@@ -587,13 +588,13 @@ void PUSCH_Decoder::decode()
     }
 }
 
-void PUSCH_Decoder::init_pusch_decoder(std::vector<DCI_UL> *dci_ul_,
-                                       std::vector<DCI_UL> *rar_dci_ul_,
+void PUSCH_Decoder::init_pusch_decoder(std::vector<DCI_UL> dci_ul_,
+                                       std::vector<DCI_UL> rar_dci_ul_,
                                        srsran_ul_sf_cfg_t &ul_sf_,
                                        SubframePower *sf_power_)
 {
-    dci_ul = dci_ul_;
-    rar_dci_ul = rar_dci_ul_;
+    dci_ul = std::move(dci_ul_);
+    rar_dci_ul = std::move(rar_dci_ul_);
     ul_sf = ul_sf_;
     sf_power = sf_power_;
 }

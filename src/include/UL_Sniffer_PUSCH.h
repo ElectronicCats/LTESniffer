@@ -55,8 +55,8 @@ public:
                   bool en_debug);
     ~PUSCH_Decoder();
 
-    void init_pusch_decoder(std::vector<DCI_UL>* dci_ul,
-                            std::vector<DCI_UL>* rar_dci_ul,
+    void init_pusch_decoder(std::vector<DCI_UL> dci_ul,
+                            std::vector<DCI_UL> rar_dci_ul,
                             srsran_ul_sf_cfg_t &ul_sf,
                             SubframePower* sf_power);
     void decode();
@@ -118,8 +118,8 @@ private:
     cf_t                    **buffer_offset    = {nullptr};
     SubframePower           *sf_power;
 
-    std::vector<DCI_UL>     *dci_ul;
-    std::vector<DCI_UL>     *rar_dci_ul;
+    std::vector<DCI_UL>     dci_ul;
+    std::vector<DCI_UL>     rar_dci_ul;
     int                     valid_ul_grant      = SRSRAN_ERROR;
 
     srsran_enb_ul_t         &enb_ul;
