@@ -176,8 +176,8 @@ bool LTESniffer_Core::run(){
     printf("Opening RF device with %d RX antennas...\n", args.rf_nof_rx_ant);
     char rfArgsCStr_a[1024];
     char rfArgsCStr_b[1024];
-    std::string rf_a_string = "clock=gpsdo,num_recv_frames=512,recv_frame_size=8000,serial=3113D1B"; 
-    std::string rf_b_string = "clock=gpsdo,num_recv_frames=512,recv_frame_size=8000,serial=3125CB5";
+    std::string rf_a_string = "clock=gpsdo,num_recv_frames=512,recv_frame_size=8000,serial=194639"; 
+    std::string rf_b_string = "clock=gpsdo,num_recv_frames=512,recv_frame_size=8000,serial=194637";
 
     /*The following strings are for USRP X310 for specific application*/
     // std::string rf_a_string = "clock=gpsdo,type=x300,addr=192.168.40.2";
@@ -467,11 +467,29 @@ bool LTESniffer_Core::run(){
             int     sfn_offset;
             n = srsran_ue_mib_decode(&ue_mib, bch_payload, NULL, &sfn_offset);
             if (n < 0) {
-              ERROR("Error decoding UE MIB");
-              exit(-1);
-              std::cout << "Error decoding MIB" << std::endl;
+              // MIB decode error — transient. Stay in DECODE_MIB and keep searching.
+              std::cout << "Error decoding MIB, staying in cell search" << std::endl;
             } else if (n == SRSRAN_UE_MIB_FOUND) {
-              srsran_pbch_mib_unpack(bch_payload, &cell, &sfn);
+              // Reject corrupt MIBs before committing. The PBCH CRC can pass on
+              // noise-heavy captures and produce impossible bandwidth values
+              // (e.g. 125, 150) that cascade into FFT init failures downstream.
+              srsran_cell_t tentative_cell = cell;
+              uint32_t tentative_sfn = sfn;
+              srsran_pbch_mib_unpack(bch_payload, &tentative_cell, &tentative_sfn);
+              bool prb_valid = (tentative_cell.nof_prb == 6  ||
+                                tentative_cell.nof_prb == 15 ||
+                                tentative_cell.nof_prb == 25 ||
+                                tentative_cell.nof_prb == 50 ||
+                                tentative_cell.nof_prb == 75 ||
+                                tentative_cell.nof_prb == 100);
+              if (!prb_valid) {
+                std::cout << "Rejected corrupt MIB (nof_prb=" << tentative_cell.nof_prb
+                          << "), staying in cell search" << std::endl;
+                srsran_pbch_decode_reset(&ue_mib.pbch);
+                break;  // leave switch, skip to next subframe iteration
+              }
+              cell = tentative_cell;
+              sfn = tentative_sfn;
               srsran_cell_fprint(stdout, &cell, sfn);
               printf("Decoded MIB. SFN: %d, offset: %d\n", sfn, sfn_offset);
               sfn   = (sfn + sfn_offset) % 1024;
@@ -591,13 +609,19 @@ bool LTESniffer_Core::run(){
       /*Change state to Decode MIB to find system frame number again*/
       if (state == DECODE_PDSCH && nof_lost_sync > 5){
         state = DECODE_MIB;
-        if (srsran_ue_mib_init(&ue_mib, cur_worker->getBuffers_a()[0], cell.nof_prb)) {
-          ERROR("Error initaiting UE MIB decoder");
-          exit(-1);
-        }
-        if (srsran_ue_mib_set_cell(&ue_mib, cell)) {
-          ERROR("Error initaiting UE MIB decoder");
-          exit(-1);
+        // srsran_ue_mib_init bzeros the struct and re-allocates sf_symbols,
+        // PBCH, FFT and chest internals. Free first or each resync leaks.
+        srsran_ue_mib_free(&ue_mib);
+        bool mib_ok = (srsran_ue_mib_init(&ue_mib, cur_worker->getBuffers_a()[0], cell.nof_prb) == 0)
+                   && (srsran_ue_mib_set_cell(&ue_mib, cell) == 0);
+        if (!mib_ok) {
+          std::cout << "MIB decoder re-init failed (nof_prb=" << cell.nof_prb
+                    << "), resetting to cell-search state" << std::endl;
+          // Force cell.nof_prb to a search-safe default so next init succeeds
+          cell.nof_prb = 6;
+          srsran_ue_mib_free(&ue_mib);
+          srsran_ue_mib_init(&ue_mib, cur_worker->getBuffers_a()[0], cell.nof_prb);
+          srsran_ue_mib_set_cell(&ue_mib, cell);
         }
         srsran_pbch_decode_reset(&ue_mib.pbch);
         nof_lost_sync = 0;
