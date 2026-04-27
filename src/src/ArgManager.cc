@@ -5,6 +5,7 @@
 #include "include/Settings.h"
 #include <iostream>
 #include <unistd.h>
+#include <getopt.h>
 #include <cstdio>
 
 #define ENABLE_AGC_DEFAULT
@@ -30,6 +31,8 @@ void ArgManager::defaultArgs(Args& args) {
   args.file_cell_id = 0;
   args.file_wrap = false;
   args.rf_args = "";
+  args.rf_a_serial = "194639";
+  args.rf_b_serial = "194637";
   args.rf_freq = -1.0;
   args.ul_freq = 0;
   args.rf_nof_rx_ant = DEFAULT_NOF_RX_ANT;
@@ -102,13 +105,26 @@ void ArgManager::usage(Args& args, const std::string& prog) {
   printf("\t-m Sniffer mode, 0 for downlink sniffing mode, 1 for uplink sniffing mode\n");
   printf("\t-z API mode, 0 for identity mapping, 1 for IMSI collecting, 2 for UECapability profiling, 3 for all\n");
   printf("\t-d Enable debug mode, print debug message to screen (Defautl disable)\n");
+  printf("\t--serial-a USRP serial for RF chain A / DL [Default %s]\n", args.rf_a_serial.c_str());
+  printf("\t--serial-b USRP serial for RF chain B / UL [Default %s]\n", args.rf_b_serial.c_str());
 }
 
 void ArgManager::parseArgs(Args& args, int argc, char **argv) {
   int opt;
   defaultArgs(args);
-  while ((opt = getopt(argc, argv, "aAcCDdEfghHilLnpPrRsStTvwWyYqFIuUmOoz")) != -1) {
+  static const struct option long_opts[] = {
+    {"serial-a", required_argument, nullptr, 1000},
+    {"serial-b", required_argument, nullptr, 1001},
+    {nullptr,    0,                 nullptr, 0}
+  };
+  while ((opt = getopt_long(argc, argv, "aAcCDdEfghHilLnpPrRsStTvwWyYqFIuUmOoz", long_opts, nullptr)) != -1) {
     switch (opt) {
+      case 1000:
+        args.rf_a_serial = optarg;
+        break;
+      case 1001:
+        args.rf_b_serial = optarg;
+        break;
       case 'a':
         args.rf_args = argv[optind];
         break;

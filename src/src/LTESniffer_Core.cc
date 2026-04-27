@@ -176,8 +176,8 @@ bool LTESniffer_Core::run(){
     printf("Opening RF device with %d RX antennas...\n", args.rf_nof_rx_ant);
     char rfArgsCStr_a[1024];
     char rfArgsCStr_b[1024];
-    std::string rf_a_string = "clock=gpsdo,num_recv_frames=512,recv_frame_size=8000,serial=194639"; 
-    std::string rf_b_string = "clock=gpsdo,num_recv_frames=512,recv_frame_size=8000,serial=194637";
+    std::string rf_a_string = "clock=gpsdo,num_recv_frames=512,recv_frame_size=8000,serial=" + args.rf_a_serial;
+    std::string rf_b_string = "clock=gpsdo,num_recv_frames=512,recv_frame_size=8000,serial=" + args.rf_b_serial;
 
     /*The following strings are for USRP X310 for specific application*/
     // std::string rf_a_string = "clock=gpsdo,type=x300,addr=192.168.40.2";

@@ -24,6 +24,8 @@ struct Args {
   uint32_t    file_cell_id;
   bool        file_wrap;
   std::string rf_args;
+  std::string rf_a_serial;
+  std::string rf_b_serial;
   uint32_t    rf_nof_rx_ant;
   double      rf_freq;
   double      rf_gain;
