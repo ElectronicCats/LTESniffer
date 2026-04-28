@@ -25,9 +25,8 @@ Currently, LTESniffer only supports 2 USRP B-series (B200/B210). Both USRP B2xx(
 The Dependencies and initial setup are similar to when using a single USRP device, please refer to [main branch README][main-readme].
 
 ```bash
-git clone https://github.com/SysSec-KAIST/LTESniffer.git
+git clone -b LTESniffer-multi-usrp https://github.com/ElectronicCats/LTESniffer.git
 cd LTESniffer
-git checkout LTESniffer-multi-usrp
 mkdir build
 cd build
 cmake ../
@@ -35,9 +34,9 @@ make -j4 (use 4 threads)
 ```
 
 ### Make your SDR ready
-After building the project the first time, please find out the serial numbers of your USRP B200/B210(s) and modify that information in the source file `src/src/LTESniffer_Core.cc`.
+Pass your USRP serial numbers at runtime via the `--serial-a` and `--serial-b` flags — no source edits or rebuild are required. Defaults are baked in for the ElectronicCats deployment (`194639` for radio A / DL, `194637` for radio B / UL); override per host as needed.
 
-**Find out the serial number of USRP**
+**Find out the serial numbers of your USRPs**
 ```bash
 uhd_find_devices
 --------------------------------------------------
@@ -60,18 +59,11 @@ Device Address:
     type: b200
 
 ```
-**Modify source file `LTESniffer_Core.cc`**
-
-In the source file `LTESniffer_Core.cc`, please look at line `179` and `180`:
-```
-  std::string rf_a_string = "clock=gpsdo,num_recv_frames=512,recv_frame_size=8000,serial=3113D1B"; 
-  std::string rf_b_string = "clock=gpsdo,num_recv_frames=512,recv_frame_size=8000,serial=3125CB5";
-```
-After that, replace the original serials with 2 serials of your B210/B200(s) and build the project again
+**Pass them to LTESniffer**
 ```bash
-cd ~/LTESniffer/build/
-make -j4
+sudo ./src/LTESniffer -A 2 -W 4 -f 1840e6 -u 1745e6 -C -m 1 --serial-a 3125XXX --serial-b 31AEXXX
 ```
+`--serial-a` is the radio that receives the downlink; `--serial-b` is the radio that receives the uplink. The args string built internally is `clock=gpsdo,num_recv_frames=512,recv_frame_size=8000,serial=<value>` for each chain — so the `gpsdo` clock requirement is preserved regardless of which serial you pass.
 **Make sure that GPSDOs in both USRP B210/B200(s) are locked**
 
 LTESniffer requires GPSDO in both B210 to be locked before it can decode uplink signal correctly.
@@ -79,7 +71,7 @@ To achieve that, please run LTESniffer the first time, stop it (Ctrl + C) once i
 
 **Step 1:** Run LTESniffer first time.
 ```bash
-sudo ./<build-dir>/src/LTESniffer -A 2 -W <number of threads> -f <DL Freq> -u <UL Freq> -C -m 1
+sudo ./<build-dir>/src/LTESniffer -A 2 -W <number of threads> -f <DL Freq> -u <UL Freq> -C -m 1 --serial-a <your serial A> --serial-b <your serial B>
 ```
 After running LTESniffer the first time, because GPSDO has not been locked yet, there will be a warning notification:
 ```
@@ -90,8 +82,8 @@ After running LTESniffer the first time, because GPSDO has not been locked yet, 
 **Step3:** Once GPSDOs are locked, you can run LTESniffer to decode uplink traffic.
 
 ```bash
-sudo ./<build-dir>/src/LTESniffer -A 2 -W <number of threads> -f <DL Freq> -u <UL Freq> -C -m 1
-example: sudo ./src/LTESniffer -A 2 -W 4 -f 1840e6 -u 1745e6 -C -m 1
+sudo ./<build-dir>/src/LTESniffer -A 2 -W <number of threads> -f <DL Freq> -u <UL Freq> -C -m 1 --serial-a <your serial A> --serial-b <your serial B>
+example: sudo ./src/LTESniffer -A 2 -W 4 -f 1840e6 -u 1745e6 -C -m 1 --serial-a 3125XXX --serial-b 31AEXXX
 ```
 
 **Using Octoclock**
