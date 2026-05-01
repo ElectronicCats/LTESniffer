@@ -54,6 +54,10 @@ struct Args {
   bool        cell_search = false;
   uint16_t    target_rnti = 0;
   int         api_mode    = -1; //api functions, 0: identity mapping, 1: UECapa, 2: IMSI
+  // PDCCH/PDSCH decode is gated by per-subframe channel-estimator SNR.
+  // Default 6.0 dB matches the original hardcoded value in DCISearch.cc.
+  // Drop to 0.0 (or lower) for marginal cells; raise for noisy environments.
+  float       snr_threshold = 6.0f;
 };
 
 class ArgManager {

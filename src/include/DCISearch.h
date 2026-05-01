@@ -21,7 +21,11 @@ public:
 
     void setShortcutDiscovery(bool enable);
     bool getShortcutDiscovery() const;
-    
+
+    /* SNR gate threshold (dB) used in search(). Set per-instance from
+     * PhyCommon::getSNRThreshold() before calling search(). */
+    void setSNRThreshold(float t) { snrThreshold = t; }
+
     /*set nof_antenna = 1 as using antenna 0 for downlink, 1 for uplink */
     void prepareDCISearch();
 private:
@@ -49,4 +53,5 @@ private:
     uint32_t sfn;
     DCIBlindSearchStats stats;
     bool enableShortcutDiscovery;
+    float snrThreshold = 6.0f;  // default matches old hardcoded gate
 };

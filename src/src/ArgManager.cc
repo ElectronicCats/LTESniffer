@@ -113,9 +113,10 @@ void ArgManager::parseArgs(Args& args, int argc, char **argv) {
   int opt;
   defaultArgs(args);
   static const struct option long_opts[] = {
-    {"serial-a", required_argument, nullptr, 1000},
-    {"serial-b", required_argument, nullptr, 1001},
-    {nullptr,    0,                 nullptr, 0}
+    {"serial-a",      required_argument, nullptr, 1000},
+    {"serial-b",      required_argument, nullptr, 1001},
+    {"snr-threshold", required_argument, nullptr, 1002},
+    {nullptr,         0,                 nullptr, 0}
   };
   while ((opt = getopt_long(argc, argv, "aAcCDdEfghHilLnpPrRsStTvwWyYqFIuUmOoz", long_opts, nullptr)) != -1) {
     switch (opt) {
@@ -124,6 +125,9 @@ void ArgManager::parseArgs(Args& args, int argc, char **argv) {
         break;
       case 1001:
         args.rf_b_serial = optarg;
+        break;
+      case 1002:
+        args.snr_threshold = strtof(optarg, nullptr);
         break;
       case 'a':
         args.rf_args = argv[optind];
@@ -145,6 +149,7 @@ void ArgManager::parseArgs(Args& args, int argc, char **argv) {
         break;
       case 'I':
         args.cell_id = static_cast<uint32_t>(strtoul(argv[optind], nullptr, 0));
+        break;
       case 'w':
         args.file_wrap = true;
         break;
@@ -178,6 +183,7 @@ void ArgManager::parseArgs(Args& args, int argc, char **argv) {
         break;
       case 'C':
         args.cell_search = true;
+        break;
       case 'm':
         args.sniffer_mode = static_cast<uint32_t>(strtoul(argv[optind], nullptr, 0));
         break;

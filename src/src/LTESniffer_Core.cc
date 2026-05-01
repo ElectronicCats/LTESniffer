@@ -105,6 +105,7 @@ LTESniffer_Core::LTESniffer_Core(const Args& args):
                 args.harq_mode,
                 &ulsche);
   phy->getCommon().setShortcutDiscovery(args.enable_shortcut_discovery);
+  phy->getCommon().setSNRThreshold(args.snr_threshold);
   std::shared_ptr<DCIConsumerList> cons(new DCIConsumerList());
   if(args.dci_file_name != "") {
     cons->addConsumer(static_pointer_cast<SubframeInfoConsumer>(std::shared_ptr<DCIToFile>(new DCIToFile(phy->getCommon().getDCIFile()))));
@@ -228,26 +229,34 @@ bool LTESniffer_Core::run(){
       ERROR("This LTESniffer branch only supports UL Sniffing with 2 USRPs \n");
     }
 
-    if (args.cell_search){
+    if (args.cell_search || args.cell_id != 0){
+      // -I <PCI> also triggers cell search. The previous "manual" path
+      // hardcoded nof_ports=2 and phich_resources=PHICH_R_1_6, which is
+      // wrong for any 4-port or non-default-PHICH cell — PDCCH/PDSCH
+      // demod fails because CRS positions and PHICH symbols are misread.
+      // Always decode MIB to populate these correctly.
+      int force_n = args.force_N_id_2;
+      // If -I PCI is set without explicit -l, narrow PSS search to the
+      // N_id_2 group containing that PCI (N_id_2 = PCI mod 3). Cuts
+      // candidate PCIs from 504 to 168.
+      if (args.cell_id != 0 && force_n < 0) {
+        force_n = args.cell_id % 3;
+      }
       uint32_t ntrial = 0;
       do {
         ret = rf_search_and_decode_mib_multi_usrp(
-            &rf_a, args.rf_nof_rx_ant, &cell_detect_config, args.force_N_id_2, &cell, &search_cell_cfo);
+            &rf_a, args.rf_nof_rx_ant, &cell_detect_config, force_n, &cell, &search_cell_cfo);
         if (ret < 0) {
           ERROR("Error searching for cell");
           exit(-1);
         } else if (ret == 0 && !go_exit) {
           printf("Cell not found after %d trials. Trying again (Press Ctrl+C to exit)\n", ntrial++);
+        } else if (args.cell_id != 0 && cell.id != args.cell_id) {
+          // Found a cell, but not the PCI -I requested. Re-search.
+          printf("Found PCI %u, but -I requested %u. Re-searching...\n", cell.id, args.cell_id);
+          ret = 0;
         }
       } while (ret == 0 && !go_exit);
-    } else{
-      //set up cell manually
-      cell.nof_prb          = args.nof_prb;
-      cell.id               = args.cell_id;
-      cell.nof_ports        = 2;
-      cell.cp               = SRSRAN_CP_NORM;
-      cell.phich_length     = SRSRAN_PHICH_NORM;
-      cell.phich_resources  = SRSRAN_PHICH_R_1_6;
     }
     srsran_rf_stop_rx_stream(&rf_a);
     srsran_rf_stop_rx_stream(&rf_b);

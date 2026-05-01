@@ -512,9 +512,7 @@ int DCISearch::search() {
     dciCollection.setSubframe(sfn, sf_idx, sf->cfi);
   }
   float snr_db = falcon_ue_dl.q->chest_res.snr_db;
-  // std::cout << "SF:" << sfn << ":" << sf_idx << "SNR = " << snr_db << std::endl;
-  if (snr_db > 6.0){
-    //PrintLifetime lt(test_string + "DCI Blind Search: ");
+  if (snr_db > snrThreshold){
     recursive_blind_dci_search(&dci_msg, sf->cfi);
     ret = SRSRAN_SUCCESS;
   }

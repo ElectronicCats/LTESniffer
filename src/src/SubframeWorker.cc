@@ -180,6 +180,7 @@ void SubframeWorker::work()
                       sf_idx, sfn,
                       &dl_sf, &ue_dl_cfg);
   dciSearch.setShortcutDiscovery(common.getShortcutDiscovery());
+  dciSearch.setSNRThreshold(common.getSNRThreshold());
 
   int snr_ret = SRSRAN_SUCCESS;
 

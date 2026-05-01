@@ -52,6 +52,11 @@ public:
   void setShortcutDiscovery(bool enable);
   bool getShortcutDiscovery() const;
 
+  // Per-subframe SNR gate threshold (dB) used by DCISearch::search().
+  // Configured once at startup from Args::snr_threshold.
+  void  setSNRThreshold(float t) { snrThreshold = t; }
+  float getSNRThreshold() const  { return snrThreshold; }
+
   //upper layer interfaces
   void setDCIConsumer(std::shared_ptr<SubframeInfoConsumer>);
   void resetDCIConsumer();
@@ -72,4 +77,5 @@ private:
   std::shared_ptr<SubframeInfoConsumer> dciConsumer;
 
   bool enableShortcutDiscovery;
+  float snrThreshold = 6.0f;  // default matches old hardcoded gate in DCISearch.cc
 };
