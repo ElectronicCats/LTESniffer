@@ -257,6 +257,19 @@ bool LTESniffer_Core::run(){
           ret = 0;
         }
       } while (ret == 0 && !go_exit);
+
+      // Cross-check user-supplied -p against MIB. -p is documented as the
+      // PRB count of the -I cell, but live RF mode lets MIB decide; if
+      // they disagree we abort rather than silently trusting MIB on top
+      // of a possibly-corrupt PBCH (PSS lock can produce garbage MIB at
+      // low SNR).
+      if (ret > 0 && args.nof_prb_explicit && args.nof_prb != cell.nof_prb) {
+        printf("Mismatch: -p %u but MIB decoded nof_prb=%u for PCI %u.\n",
+               args.nof_prb, cell.nof_prb, cell.id);
+        printf("If you trust the MIB, drop -p (or pass -p %u).\n", cell.nof_prb);
+        printf("If you trust -p, the MIB likely came from a low-SNR PBCH false lock.\n");
+        exit(-1);
+      }
     }
     srsran_rf_stop_rx_stream(&rf_a);
     srsran_rf_stop_rx_stream(&rf_b);

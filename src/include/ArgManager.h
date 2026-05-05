@@ -19,6 +19,10 @@ struct Args {
   int         file_offset_time;
   double      file_offset_freq;
   uint32_t    nof_prb;
+  // Set true when the user passes -p explicitly. Used to cross-check the
+  // MIB-decoded PRB count when -I is also given (live RF mode); in
+  // file-input mode args.nof_prb is authoritative regardless.
+  bool        nof_prb_explicit = false;
   uint32_t    file_nof_prb;
   uint32_t    file_nof_ports;
   uint32_t    file_cell_id;

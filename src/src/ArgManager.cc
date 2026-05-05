@@ -98,7 +98,10 @@ void ArgManager::usage(Args& args, const std::string& prog) {
   printf("\t-q Enable MCS table tracking algorithm (Default best: enable)\n");
   printf("\t-r Target RNTI, LTESniffer only decodes traffic of input target RNTI \n");
   printf("\t-I Specify a cell ID, need to remove -C to use this option (Default disable)\n");
-  printf("\t-p Specify number of PRB of specified cell ID (-I) (Default 50)\n");
+  printf("\t-p Number of PRB. In live RF mode this is a cross-check against the\n");
+  printf("\t   MIB-decoded value (warns and aborts on mismatch). In file-input\n");
+  printf("\t   mode (-i) it is authoritative since there is no MIB to decode.\n");
+  printf("\t   (Default 50)\n");
   printf("\t-f Downlink Frequency\n");
   printf("\t-u Uplink Frequency  \n");
   printf("\t-A Number of RX antennas [Default %d]\n", args.rf_nof_rx_ant);
@@ -171,6 +174,7 @@ void ArgManager::parseArgs(Args& args, int argc, char **argv) {
       case 'p':
         args.nof_prb = static_cast<uint32_t>(strtoul(argv[optind], nullptr, 0));
         args.file_nof_prb = args.nof_prb;
+        args.nof_prb_explicit = true;
         break;
       case 'P':
         args.file_nof_ports = static_cast<uint32_t>(strtoul(argv[optind], nullptr, 0));
