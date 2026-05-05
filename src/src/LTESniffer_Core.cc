@@ -674,15 +674,19 @@ bool LTESniffer_Core::run(){
   }
   cv.notify_all();
 
+  // Wait for streaming threads to exit cleanly while rf_a/rf_b are still
+  // valid stack vars; otherwise the futures' lambdas race the stack
+  // unwind and segfault during global teardown.
+  uhd_stream_thread.join();
+
   std::cout << "Destroyed Phy" << std::endl;
   if (args.input_file_name == ""){
-    // srsran_rf_close(&rf_a);
-    // srsran_rf_close(&rf_b);
+    srsran_rf_close(&rf_a);
+    srsran_rf_close(&rf_b);
     //srsran_ue_dl_free(falcon_ue_dl.q);
     srsran_ue_sync_free(&ue_sync_a);
     srsran_ue_mib_free(&ue_mib);
   }
-  // uhd_stream_thread.~UhdStreamThread();
 
   cout << "Skipped subframe: " << skip_cnt << " / " << sf_cnt << endl;
   phy->getCommon().printStats();
@@ -703,10 +707,10 @@ void LTESniffer_Core::handleSignal() {
 
 LTESniffer_Core::~LTESniffer_Core(){
   pcapwriter.close();
-  // delete        harq_map;
-  // harq_map    = nullptr;
-  // delete        phy;
-  // phy         = nullptr;
+  // run() already calls phy->joinPending(); ~Phy() repeats cancel/join
+  // (idempotent) and frees workers, queues, MetaFormats, RNTIManager, etc.
+  delete phy;
+  phy = nullptr;
   printf("Deleted DL Sniffer core\n");
 }
 void LTESniffer_Core::setDCIConsumer(std::shared_ptr<SubframeInfoConsumer> consumer) {
@@ -897,8 +901,16 @@ UhdStreamThread::UhdStreamThread(){
 
 UhdStreamThread::~UhdStreamThread(){
   uhd_stop = true;
-  // future_a.wait();
-  // future_b.wait();
+  // Best-effort wake; run() should already have called join(). If it did
+  // not (early exit in main()), wait here so the futures don't outlive the
+  // mutex/condvar globals they reference.
+  cv.notify_all();
+  join();
+}
+
+void UhdStreamThread::join(){
+  if (future_a.valid()) future_a.wait();
+  if (future_b.valid()) future_b.wait();
 }
 
 void UhdStreamThread::run(){
@@ -924,7 +936,8 @@ void UhdStreamThread::prepare_stream_thread(void* rf_a_, void* rf_b_, int nsampl
 int UhdStreamThread::get_data_stream_a(){
   while(!uhd_stop){
     std::unique_lock<std::mutex> lock_a(mtx_a);
-    cv.wait(lock_a, [] { return a_triggered; });
+    cv.wait(lock_a, [] { return a_triggered || uhd_stop; });
+    if (uhd_stop) break;
     a_triggered = false;
     {
       srsran_rf_recv_with_time_multi((srsran_rf_t*)rf_a, ptr_a, nof_sample_a, true, &secs_a, &frac_secs_a);
@@ -935,29 +948,27 @@ int UhdStreamThread::get_data_stream_a(){
     }
     lock_a.unlock();
   }
-  //if uhd_stop == true
-  srsran_rf_close((srsran_rf_t*)rf_a);
-  
+  // RF close happens in LTESniffer_Core::run() after join(), where rf_a is
+  // still a valid stack pointer.
   return SRSRAN_SUCCESS;
 }
 
 int UhdStreamThread::get_data_stream_b(){
   while(!uhd_stop){
     std::unique_lock<std::mutex> lock_b(mtx_b);
-    cv.wait(lock_b, [] { return b_triggered; });
+    cv.wait(lock_b, [] { return b_triggered || uhd_stop; });
+    if (uhd_stop) break;
     b_triggered = false;
     {
       srsran_rf_recv_with_time_multi((srsran_rf_t*)rf_b, ptr_b, nof_sample_b, true, &secs_b, &frac_secs_b);
     }
-    
+
     {
       b_finished = true;
       b_fn_cv.notify_one();
     }
   }
-  //if uhd_stop == true
-  srsran_rf_close((srsran_rf_t*)rf_b);
-  
+  // RF close happens in LTESniffer_Core::run() after join(); see get_data_stream_a.
   return SRSRAN_SUCCESS;
 }
 

@@ -100,6 +100,9 @@ public:
   void prepare_stream_thread(void* rf_a_, void* rf_b_, int nsample_a, int nsample_b, void** ptr_a_, void** ptr_b_);
   int get_data_stream_a();
   int get_data_stream_b();
+  // Wait for both streaming futures to finish. Caller must have set uhd_stop
+  // and woken the cv first; safe to call multiple times.
+  void join();
   void run();
   std::string frac_sec_double_to_string(double value, int precision);  
   bool check_running(){return is_running;}
