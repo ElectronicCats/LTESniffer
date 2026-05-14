@@ -131,6 +131,11 @@ private:
     /*variables for prach*/
     srsran_prach_cfg_t      prach_cfg           = {};
     srsran_prach_t          prach               = {};
+    // PRB count we last configured PRACH for. 0 = never configured. Compared
+    // against enb_ul.cell.nof_prb each work_prach() so we can detect when
+    // the worker's initial set_rach_config() ran before SIB2 / cell-setup
+    // had populated the right values, and re-init from a fresh snapshot.
+    uint32_t                prach_configured_nof_prb = 0;
     uint32_t                prach_indices[165]  = {};
     float                   prach_offsets[165]  = {};
     float                   prach_p2avg[165]    = {};

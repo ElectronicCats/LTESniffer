@@ -84,7 +84,10 @@ public:
     uint32_t             get_rnti()                      { return rnti;     }
     bool                 get_multi_ul_offset_cfg()       { return multi_ul_offset;}
     void                 set_multi_offset(int enable)    { multi_ul_offset = enable;}
-    srsran_prach_cfg_t   get_prach_config()              { return prach_cfg;}
+    // Lock against torn reads vs set_config(): the setter populates prach_cfg
+    // field-by-field under ulsche_mutex, so an unlocked reader can otherwise
+    // observe a half-updated struct and configure PRACH with bogus values.
+    srsran_prach_cfg_t   get_prach_config()              { std::unique_lock<std::mutex> l(ulsche_mutex); return prach_cfg; }
     srsran_refsignal_dmrs_pusch_cfg_t   get_dmrs();
     asn1::rrc::rrc_conn_setup_r8_ies_s  get_rrc_con_set(){return rrc_con_set;}
     void                 set_SIB2(asn1::rrc::sib_type2_s* sib2);

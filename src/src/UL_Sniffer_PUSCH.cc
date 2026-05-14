@@ -662,6 +662,13 @@ std::string PUSCH_Decoder::modulation_mode_string_256(int idx)
 
 void PUSCH_Decoder::set_rach_config(srsran_prach_cfg_t prach_cfg_)
 {
+    // Free any previously-initialized PRACH so we can re-init cleanly when
+    // the cell / SIB2 config changes after the first call. Guarded so the
+    // very first call doesn't free a zero-initialized prach struct (which
+    // may not be safe inside srsran_prach_free).
+    if (prach_configured_nof_prb != 0) {
+        srsran_prach_free(&prach);
+    }
     prach_cfg = prach_cfg_;
     if (srsran_prach_init(&prach, srsran_symbol_sz(enb_ul.cell.nof_prb)))
     {
@@ -673,10 +680,27 @@ void PUSCH_Decoder::set_rach_config(srsran_prach_cfg_t prach_cfg_)
     }
     srsran_prach_set_detect_factor(&prach, 60);
     nof_sf = (uint32_t)ceilf(prach.T_tot * 1000);
+    prach_configured_nof_prb = enb_ul.cell.nof_prb;
 }
 
 void PUSCH_Decoder::work_prach()
 {
+    // The worker's initial set_rach_config() runs once on first UL subframe.
+    // At that moment, enb_ul.cell.nof_prb may still be the enb_ul_init
+    // default (and not the MIB-decoded value), and the SIB2-derived
+    // prach_cfg in ulsche may be mid-update (get_prach_config is unlocked,
+    // races with set_config). Either makes srsran_prach_set_cfg pick a
+    // wrong N_ifft_prach and every srsran_prach_detect_offset call rejects
+    // input with sig_len < N_ifft_prach (prach.c:981 ERROR). Re-init here
+    // when we see the cell or SIB2 config has converged on different values.
+    if (enb_ul.cell.nof_prb > 0) {
+        srsran_prach_cfg_t latest = ulsche->get_prach_config();
+        if (prach_configured_nof_prb != enb_ul.cell.nof_prb ||
+            memcmp(&latest, &prach_cfg, sizeof(prach_cfg)) != 0) {
+            set_rach_config(latest);
+        }
+    }
+
     uint32_t prach_nof_det = 0;
     if (srsran_prach_tti_opportunity(&prach, ul_sf.tti, -1))
     {
