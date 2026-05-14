@@ -243,6 +243,7 @@ bool LTESniffer_Core::run(){
         force_n = args.cell_id % 3;
       }
       uint32_t ntrial = 0;
+      uint32_t prb_mismatch_count = 0;
       do {
         ret = rf_search_and_decode_mib_multi_usrp(
             &rf_a, args.rf_nof_rx_ant, &cell_detect_config, force_n, &cell, &search_cell_cfo);
@@ -255,21 +256,24 @@ bool LTESniffer_Core::run(){
           // Found a cell, but not the PCI -I requested. Re-search.
           printf("Found PCI %u, but -I requested %u. Re-searching...\n", cell.id, args.cell_id);
           ret = 0;
+        } else if (ret > 0 && args.nof_prb_explicit && args.nof_prb != cell.nof_prb) {
+          // -p cross-check. MIB at low SNR can false-lock to a wrong nof_prb;
+          // retrying typically converges on the right value within a few
+          // attempts. After many retries, warn and continue with MIB so we
+          // don't loop forever — user should re-check antenna/gain if it
+          // takes that long.
+          prb_mismatch_count++;
+          if (prb_mismatch_count <= 10) {
+            printf("MIB nof_prb=%u != -p %u for PCI %u (attempt %u). Retrying (likely low-SNR PBCH false lock)...\n",
+                   cell.nof_prb, args.nof_prb, cell.id, prb_mismatch_count);
+            ret = 0;
+          } else {
+            printf("WARNING: MIB nof_prb=%u stayed != -p %u after %u attempts. Continuing with MIB value. "
+                   "If decoding fails, drop -p or improve signal quality.\n",
+                   cell.nof_prb, args.nof_prb, prb_mismatch_count);
+          }
         }
       } while (ret == 0 && !go_exit);
-
-      // Cross-check user-supplied -p against MIB. -p is documented as the
-      // PRB count of the -I cell, but live RF mode lets MIB decide; if
-      // they disagree we abort rather than silently trusting MIB on top
-      // of a possibly-corrupt PBCH (PSS lock can produce garbage MIB at
-      // low SNR).
-      if (ret > 0 && args.nof_prb_explicit && args.nof_prb != cell.nof_prb) {
-        printf("Mismatch: -p %u but MIB decoded nof_prb=%u for PCI %u.\n",
-               args.nof_prb, cell.nof_prb, cell.id);
-        printf("If you trust the MIB, drop -p (or pass -p %u).\n", cell.nof_prb);
-        printf("If you trust -p, the MIB likely came from a low-SNR PBCH false lock.\n");
-        exit(-1);
-      }
     }
     srsran_rf_stop_rx_stream(&rf_a);
     srsran_rf_stop_rx_stream(&rf_b);
