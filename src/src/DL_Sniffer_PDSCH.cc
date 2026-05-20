@@ -2,16 +2,6 @@
 
 float p_a_array[8]{-6, -4.77, -3, -1.77, 0, 1, 2, 3};
 
-// Wraps srsran_ue_dl_decode_pdsch's return so the surrounding if() only fires
-// for real PDSCH errors. SRSRAN_ERROR_PDSCH_RE_MISMATCH is the marker srsran
-// returns for grant-vs-grid symbol-count disagreement, which is overwhelmingly
-// caused by PDCCH false-positive CRC matches and is non-fatal. Suppressing it
-// here keeps real demod failures (invalid params, layer OOB, predecode error,
-// CRC failure on a valid PDSCH) loud.
-static inline bool is_real_pdsch_decode_error(int ret) {
-	return ret && ret != SRSRAN_ERROR_PDSCH_RE_MISMATCH;
-}
-
 PDSCH_Decoder::PDSCH_Decoder(uint32_t idx,
 							 LTESniffer_pcap_writer *pcapwriter,
 							 MCSTracking *mcs_tracking,
@@ -223,7 +213,7 @@ int PDSCH_Decoder::run_decode(int &mimo_ret,
 		// main function to decode
 		if (pdsch_cfg->grant.tb[0].enabled || pdsch_cfg->grant.tb[1].enabled)
 		{
-			if (is_real_pdsch_decode_error(srsran_ue_dl_decode_pdsch(falcon_ue_dl->q, dl_sf, pdsch_cfg, pdsch_res)))
+			if (srsran_ue_dl_decode_pdsch(falcon_ue_dl->q, dl_sf, pdsch_cfg, pdsch_res))
 			{
 				ERROR("ERROR: Decoding PDSCH");
 			}
@@ -470,7 +460,7 @@ int PDSCH_Decoder::decode_SIB() // change to decode SIB
 				// main function to decode
 				if (pdsch_cfg->grant.tb[0].enabled || pdsch_cfg->grant.tb[1].enabled)
 				{
-					if (is_real_pdsch_decode_error(srsran_ue_dl_decode_pdsch(falcon_ue_dl->q, dl_sf, pdsch_cfg, pdsch_res)))
+					if (srsran_ue_dl_decode_pdsch(falcon_ue_dl->q, dl_sf, pdsch_cfg, pdsch_res))
 					{
 						ERROR("ERROR: Decoding PDSCH");
 					}
@@ -658,7 +648,7 @@ int PDSCH_Decoder::run_rar_decode(srsran_dci_format_t cur_format,
 		if (pdsch_cfg->grant.tb[0].enabled || pdsch_cfg->grant.tb[1].enabled)
 		{
 			// std::cout << "Runing table: " << table << " -- 1" << std::endl;
-			if (is_real_pdsch_decode_error(srsran_ue_dl_decode_pdsch(falcon_ue_dl->q, dl_sf, pdsch_cfg, pdsch_res)))
+			if (srsran_ue_dl_decode_pdsch(falcon_ue_dl->q, dl_sf, pdsch_cfg, pdsch_res))
 			{
 				ERROR("ERROR: Decoding PDSCH");
 			}
@@ -870,7 +860,7 @@ int PDSCH_Decoder::decode_dl_mode()
 					// main function to decode
 					if (pdsch_cfg->grant.tb[0].enabled || pdsch_cfg->grant.tb[1].enabled)
 					{
-						if (is_real_pdsch_decode_error(srsran_ue_dl_decode_pdsch(falcon_ue_dl->q, dl_sf, pdsch_cfg, pdsch_res)))
+						if (srsran_ue_dl_decode_pdsch(falcon_ue_dl->q, dl_sf, pdsch_cfg, pdsch_res))
 						{
 							ERROR("ERROR: Decoding PDSCH");
 						}
@@ -978,7 +968,7 @@ int PDSCH_Decoder::decode_dl_mode()
 					}
 
 					/*main function to decode */
-					if (is_real_pdsch_decode_error(srsran_ue_dl_decode_pdsch(falcon_ue_dl->q, dl_sf, pdsch_cfg, pdsch_res)))
+					if (srsran_ue_dl_decode_pdsch(falcon_ue_dl->q, dl_sf, pdsch_cfg, pdsch_res))
 					{
 						ERROR("ERROR: Decoding PDSCH");
 					}
@@ -1071,7 +1061,7 @@ int PDSCH_Decoder::decode_dl_mode()
 						}
 
 						// main function to decode
-						if (is_real_pdsch_decode_error(srsran_ue_dl_decode_pdsch(falcon_ue_dl->q, dl_sf, pdsch_cfg, pdsch_res)))
+						if (srsran_ue_dl_decode_pdsch(falcon_ue_dl->q, dl_sf, pdsch_cfg, pdsch_res))
 						{
 							ERROR("ERROR: Decoding PDSCH");
 						}
