@@ -691,6 +691,15 @@ bool LTESniffer_Core::run(){
   }
   cv.notify_all();
 
+  // Stop RX streaming so any in-flight blocking srsran_rf_recv_with_time_multi()
+  // in the streaming threads returns; otherwise join() below can hang forever on
+  // a stuck recv (the Ctrl-C / SIGTERM shutdown hang). Mirrors the cell-search
+  // exit path (~L278). Guarded like the srsran_rf_close() calls below.
+  if (args.input_file_name == ""){
+    srsran_rf_stop_rx_stream(&rf_a);
+    srsran_rf_stop_rx_stream(&rf_b);
+  }
+
   // Wait for streaming threads to exit cleanly while rf_a/rf_b are still
   // valid stack vars; otherwise the futures' lambdas race the stack
   // unwind and segfault during global teardown.
